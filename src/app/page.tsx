@@ -265,13 +265,7 @@ export default function Index() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
       const data: ChatResponse = await response.json();
-
-      console.log(data, "data");
 
       const aiMessage: string = data?.response || data?.error || "No response";
       const finalMessages: Message[] = [

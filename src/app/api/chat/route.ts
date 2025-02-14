@@ -104,9 +104,14 @@ const getLLMResponse = async <T = unknown>(
 export async function POST(req: Request) {
   const { userId, messages: chatMessages, model } = await req.json();
 
-  // Rate limiting (uncomment when ready)
-  // const { success } = await rateLimiter.limit(userId);
-  // if (!success) return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  // Rate limiting
+  const { success } = await rateLimiter.limit(userId);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
 
   // Process latest user message
   const latestMessage = chatMessages?.[chatMessages?.length - 1];

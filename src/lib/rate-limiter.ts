@@ -1,22 +1,20 @@
-import redis from './redis';
+import redis from "./redis";
 
-const WINDOW_SIZE_IN_SECONDS = 60; // 1 minute
-const MAX_REQUESTS = 5; // Max requests per user per minute
+const WINDOW_SIZE_IN_SECONDS: number =
+  Number(process.env.WINDOW_SIZE_IN_SECONDS) || 60; // 1 minute
+const MAX_REQUESTS: number = Number(process.env.MAX_WINDOW_REQUEST_COUNT) || 5; 
 
 export const rateLimiter = {
-  async limit(userId: string) {
-    const key = `rate-limit:${userId}`;
+  async limit(userId: string): Promise<{ success: boolean }> {
+    const key: string = `rate-limit:${userId}`;
 
-    // Check the current count
-    const currentCount = await redis.get(key);
+    // Use Upstash pipeline (atomic operations)
+    const [currentCount]: [number] = await redis
+      .pipeline()
+      .incr(key)
+      .expire(key, WINDOW_SIZE_IN_SECONDS) // Set expiry time
+      .exec<[number]>();
 
-    if (currentCount && parseInt(currentCount) >= MAX_REQUESTS) {
-      return { success: false };
-    }
-
-    // Increment request count and set expiry
-    await redis.multi().incr(key).expire(key, WINDOW_SIZE_IN_SECONDS).exec();
-
-    return { success: true };
+    return { success: currentCount <= MAX_REQUESTS };
   },
 };
