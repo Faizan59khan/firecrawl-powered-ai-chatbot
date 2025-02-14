@@ -22,9 +22,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface Message {
+export interface Message {
   content: string;
   isUser: boolean;
+  fireCrawlErrorMessage?: string;
 }
 
 interface ChatSession {
@@ -33,6 +34,12 @@ interface ChatSession {
   messages: Message[];
   model: string;
   createdAt: number;
+}
+
+interface ChatResponse {
+  response?: string;
+  error?: string;
+  fireCrawlError?: string;
 }
 
 interface Model {
@@ -46,18 +53,23 @@ const models: Model[] = [
   {
     id: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
     name: "Llama 3.3 70B Turbo",
-    description: "Most capable model for diverse tasks",
+    description: "Most capable model",
     icon: <Sparkles className="w-5 h-5" />,
   },
   {
     id: "meta-llama/Llama-3.3-13B-Instruct",
     name: "Llama 3.3 13B",
-    description: "Faster, more focused responses",
+    description: "Faster instant responses",
     icon: <Zap className="w-5 h-5" />,
   },
 ];
 
-const helperPrompts = [
+interface HelperPrompt {
+  title: string;
+  prompt: string;
+}
+
+const helperPrompts: HelperPrompt[] = [
   {
     title: "Crawl a Website",
     prompt:
@@ -75,48 +87,79 @@ const helperPrompts = [
   },
 ];
 
-// Function to format the message content with markdown-like styling
+// Format content sections (LLM response into JSX)
 const formatMessage = (content: string) => {
-  // Convert the string content to JSX with proper formatting
-  const formattedContent = content?.split("\n")?.map((line, index) => {
-    // Handle headings
-    if (line.startsWith("# ")) {
-      return <h1 key={index}>{line.slice(2)}</h1>;
-    }
-    if (line.startsWith("## ")) {
-      return <h2 key={index}>{line.slice(3)}</h2>;
-    }
-    if (line.startsWith("### ")) {
-      return <h3 key={index}>{line.slice(4)}</h3>;
-    }
+  if (!content) return null;
 
-    // Handle bold text
-    line = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  const inlineCodeRegex = /`([^`]+)`/g;
+  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
 
-    // Handle lists
-    if (line?.match(/^\d+\./)) {
+  // Split content by code blocks while preserving order
+  const sections = content?.split(codeBlockRegex);
+
+  const formattedContent = sections?.map((section, index) => {
+    // Handle multi-line code blocks
+    if (index % 3 === 2) {
       return (
-        <ol key={index} className="list-decimal ml-6">
-          <li
-            dangerouslySetInnerHTML={{ __html: line.replace(/^\d+\.\s/, "") }}
-          />
-        </ol>
-      );
-    }
-    if (line.match(/^\* /)) {
-      return (
-        <ul key={index} className="list-disc ml-6">
-          <li dangerouslySetInnerHTML={{ __html: line.slice(2) }} />
-        </ul>
+        <pre
+          key={index}
+          className="bg-gray-900 text-white p-4 rounded-lg overflow-x-auto my-3"
+        >
+          <code className="block font-mono text-sm">{section}</code>
+        </pre>
       );
     }
 
-    // Handle regular paragraphs
-    return line ? (
-      <p key={index} dangerouslySetInnerHTML={{ __html: line }} />
-    ) : (
-      <br key={index} />
-    );
+    // Process regular text content
+    return section?.split("\n")?.map((line, i) => {
+      if (line?.startsWith("# "))
+        return (
+          <h1 key={i} className="text-2xl font-bold my-2">
+            {line?.slice(2)}
+          </h1>
+        );
+      if (line?.startsWith("## "))
+        return (
+          <h2 key={i} className="text-xl font-semibold my-2">
+            {line?.slice(3)}
+          </h2>
+        );
+      if (line?.startsWith("### "))
+        return (
+          <h3 key={i} className="text-lg font-semibold my-2">
+            {line?.slice(4)}
+          </h3>
+        );
+
+      // Inline code
+      line = line?.replace(
+        inlineCodeRegex,
+        `<code class='bg-gray-800 text-yellow-300 px-1 py-0.5 rounded-md font-mono'>$1</code>`
+      );
+
+      // Ordered list
+      if (/^\d+\./.test(line)) {
+        return (
+          <ol key={i} className="list-decimal ml-6">
+            <li
+              dangerouslySetInnerHTML={{ __html: line.replace(/^\d+\.\s/, "") }}
+            />
+          </ol>
+        );
+      }
+
+      // Unordered list
+      if (/^\* /.test(line)) {
+        return (
+          <ul key={i} className="list-disc ml-6">
+            <li dangerouslySetInnerHTML={{ __html: line.slice(2) }} />
+          </ul>
+        );
+      }
+
+      // Paragraphs
+      return <p key={i} dangerouslySetInnerHTML={{ __html: line }} />;
+    });
   });
 
   return <div className="markdown-content">{formattedContent}</div>;
@@ -143,12 +186,12 @@ export default function Index() {
   // Load current chat
   useEffect(() => {
     if (currentChatId) {
-      const currentChat = chatSessions.find(
-        (chat) => chat.id === currentChatId
+      const currentChat = chatSessions?.find(
+        (chat) => chat?.id === currentChatId
       );
       if (currentChat) {
-        setMessages(currentChat.messages);
-        setSelectedModel(currentChat.model);
+        setMessages(currentChat?.messages);
+        setSelectedModel(currentChat?.model);
       }
     }
   }, [currentChatId, chatSessions]);
@@ -184,14 +227,14 @@ export default function Index() {
     if (!currentChatId) return;
 
     setChatSessions((prev) =>
-      prev.map((chat) => {
-        if (chat.id === currentChatId) {
+      prev?.map((chat) => {
+        if (chat?.id === currentChatId) {
           const title =
-            messages[0]?.content?.slice(0, 30) + "..." || "New Chat";
+            messages?.[0]?.content?.slice(0, 30) + "..." || "New Chat";
           return {
             ...chat,
             messages,
-            title: chat.messages.length === 0 ? title : chat.title,
+            title: chat?.messages?.length === 0 ? title : chat?.title,
             model: selectedModel,
           };
         }
@@ -201,7 +244,6 @@ export default function Index() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log("yes");
     e.preventDefault();
     if (!input.trim()) return;
 
@@ -211,28 +253,36 @@ export default function Index() {
     updateCurrentChat(updatedMessages);
     setInput("");
     setIsLoading(true);
-    console.log("1");
 
     try {
-      const response = await fetch("/api/chat", {
+      const response: Response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: "user_123",
-          message: input,
+          messages: updatedMessages, // Send entire message history
           model: selectedModel,
         }),
       });
 
-      const data = await response.json();
-      console.log(data, "2");
-      const aiMessage =
-        data?.choices?.[0]?.message?.content || data?.response || data?.error;
-      const finalMessages = [
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data: ChatResponse = await response.json();
+
+      console.log(data, "data");
+
+      const aiMessage: string = data?.response || data?.error || "No response";
+      const finalMessages: Message[] = [
         ...updatedMessages,
-        { content: aiMessage, isUser: false },
+        {
+          content: aiMessage,
+          isUser: false,
+          fireCrawlErrorMessage: data?.fireCrawlError,
+        },
       ];
-      console.log(data);
+
       setMessages(finalMessages);
       updateCurrentChat(finalMessages);
     } catch (error: unknown) {
@@ -241,13 +291,12 @@ export default function Index() {
       } else {
         console.log("Unexpected error:", error);
       }
+
       const errorMessages = [
         ...updatedMessages,
-        {
-          content: "Error fetching response",
-          isUser: false,
-        },
+        { content: "Error fetching response", isUser: false },
       ];
+
       setMessages(errorMessages);
       updateCurrentChat(errorMessages);
     } finally {
@@ -257,7 +306,7 @@ export default function Index() {
 
   const deleteChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setChatSessions((prev) => prev.filter((chat) => chat.id !== chatId));
+    setChatSessions((prev) => prev?.filter((chat) => chat?.id !== chatId));
     if (currentChatId === chatId) {
       setCurrentChatId("");
       setMessages([]);
@@ -266,19 +315,16 @@ export default function Index() {
 
   const renameChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const chat = chatSessions.find((c) => c.id === chatId);
+    const chat = chatSessions?.find((c) => c?.id === chatId);
     if (!chat) return;
 
-    const newTitle = prompt("Enter new chat name:", chat.title);
+    const newTitle = prompt("Enter new chat name:", chat?.title);
     if (!newTitle) return;
 
     setChatSessions((prev) =>
-      prev.map((c) => (c.id === chatId ? { ...c, title: newTitle } : c))
+      prev?.map((c) => (c?.id === chatId ? { ...c, title: newTitle } : c))
     );
   };
-
-  console.log("Rendering...");
-  console.log("Messages:", messages);
 
   return (
     <div className="min-h-screen bg-[#343541] text-gray-100 flex">
@@ -352,7 +398,7 @@ export default function Index() {
           {/* Logo */}
           <div className="flex items-center justify-between mb-8">
             <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[300px] bg-[#40414f] border-0 text-white">
+              <SelectTrigger className="w-[300px] h-auto bg-[#40414f] border-0 text-white">
                 <SelectValue placeholder="Select a model" />
               </SelectTrigger>
               <SelectContent className="bg-[#40414f] border-gray-700">
@@ -429,6 +475,11 @@ export default function Index() {
                 </div>
                 <div className="flex-1 space-y-2 overflow-hidden">
                   {formatMessage(msg?.content)}
+                  {msg?.fireCrawlErrorMessage && (
+                    <span className="block text-red-500">
+                      {msg?.fireCrawlErrorMessage}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
