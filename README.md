@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FireChatAI
 
-## Getting Started
+FireChatAI is a full-stack Next.js application that integrates **Together AI LLM** and **Firecrawl** to provide AI-generated responses along with web-crawled content. The app also implements rate limiting using **Upstash Redis**.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- AI-powered responses using **Together AI LLM**.
+- Web content crawling using **Firecrawl**.
+- Rate limiting with **Upstash Redis**.
+- API route `/api/chat` that combines LLM-generated responses with web-crawled data.
+
+## Tech Stack
+
+- **Next.js** (Full-stack framework)
+- **Together AI LLM** (Language Model)
+- **Firecrawl** (Web Crawler)
+- **Upstash Redis** (Rate Limiting)
+
+---
+
+## Setup Instructions
+
+### Prerequisites
+
+- Node.js (>= 16.x recommended)
+- npm or yarn
+- Upstash Redis account
+- Together AI API key
+- Firecrawl API key
+
+### Installation
+
+1. **Clone the repository:**
+   ```sh
+   git clone https://github.com/Faizan59khan/firecrawl-powered-ai-chatbot.git
+   cd firecrawl-powered-ai-chatbot
+   ```
+
+2. **Install dependencies:**
+   ```sh
+   npm install
+   # or
+   yarn install
+   ```
+
+3. **Set up environment variables:**
+   Create a `.env.local` file in the root directory and add the following:
+   ```env
+   UPSTASH_REDIS_URL=
+   UPSTASH_REDIS_TOKEN=
+   WINDOW_SIZE_IN_SECONDS=
+   MAX_WINDOW_REQUEST_COUNT=
+   NEXT_PUBLIC_LLM_API_KEY=
+   NEXT_PUBLIC_FIRECRAWL_API_KEY=
+   ```
+
+4. **Run the development server:**
+   ```sh
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+5. **Access the app:**
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## API Endpoints
+
+### `POST /api/chat`
+
+#### Request Body:
+```json
+{
+"userId": "123",
+"message": "What is example.com about?",
+"model": "gemini-pro"
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+#### Response Example:
+```json
+{
+"response": "Example.com is a technology blog that covers..."
+}
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment
 
-## Learn More
+You can deploy the project using **Vercel**:
+```sh
+vercel deploy
+```
+Or any other Next.js-compatible hosting service.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
+This project is licensed under the MIT License.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Contributions
+Contributions are welcome! Feel free to open an issue or submit a pull request.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Contact
+For any inquiries, reach out to **[your email or GitHub handle]**.
+
+---
+
+Happy Coding! 🚀
+

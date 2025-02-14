@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
-import { rateLimiter } from "../../../lib/rate-limiter";
 import { Message } from "@/app/page";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
 
 interface FirecrawlResponse<T extends object = {}> {
   success: boolean;
@@ -42,7 +44,17 @@ interface LLMResponse<T = unknown> {
   usage: LLMUsage;
 }
 
-// export const runtime = 'edge';
+export const runtime = 'edge';
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_URL!,
+  token: process.env.UPSTASH_REDIS_TOKEN!,
+});
+
+const ratelimit = new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(2, "30 s"), // Adjust these values as needed
+});
 
 const detectDomain = (text: string): string | null => {
   const domainRegex =
@@ -101,11 +113,13 @@ const getLLMResponse = async <T = unknown>(
   }
 };
 
+
 export async function POST(req: Request) {
   const { userId, messages: chatMessages, model } = await req.json();
 
   // Rate limiting
-  const { success } = await rateLimiter.limit(userId);
+  const { success } = await ratelimit.limit(userId);
+  console.log(success, "success");
   if (!success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
