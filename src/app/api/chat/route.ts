@@ -61,16 +61,16 @@ export async function POST(req: Request) {
   const { userId, message, model } = await req.json();
 
   // Rate limiting
-  const { success } = await rateLimiter.limit(userId);
-  if (!success) {
-    return NextResponse.json(
-      {
-        error:
-          "You've reached the maximum request limit. Please try again later.",
-      },
-      { status: 429 }
-    );
-  }
+  // const { success } = await rateLimiter.limit(userId);
+  // if (!success) {
+  //   return NextResponse.json(
+  //     {
+  //       error:
+  //         "You've reached the maximum request limit. Please try again later.",
+  //     },
+  //     { status: 429 }
+  //   );
+  // }
 
   // Website detection
   const domain = detectDomain(message);
