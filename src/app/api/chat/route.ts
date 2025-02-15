@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import axios from "axios";
 import { Message } from "@/app/page";
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+import Together from "together-ai";
+import redis from "@/lib/redis";
 
+const together = new Together({ apiKey: process.env.NEXT_PUBLIC_LLM_API_KEY! });
 
 interface FirecrawlResponse<T extends object = {}> {
   success: boolean;
@@ -44,16 +46,16 @@ interface LLMResponse<T = unknown> {
   usage: LLMUsage;
 }
 
-export const runtime = 'edge';
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_URL!,
-  token: process.env.UPSTASH_REDIS_TOKEN!,
-});
+export const runtime = "edge";
 
 const ratelimit = new Ratelimit({
   redis: redis,
-  limiter: Ratelimit.slidingWindow(2, "30 s"), // Adjust these values as needed
+  limiter: Ratelimit.slidingWindow(
+    Number(process.env.MAX_WINDOW_REQUEST_COUNT) || 5,
+    Number(process?.env.WINDOW_SIZE_IN_SECONDS)
+      ? `${Number(process?.env.WINDOW_SIZE_IN_SECONDS)} s`
+      : "60 s"
+  ),
 });
 
 const detectDomain = (text: string): string | null => {
@@ -87,39 +89,11 @@ const fetchWithFirecrawl = async <T extends object = {}>(
   }
 };
 
-const getLLMResponse = async <T = unknown>(
-  messages: LLMMessage[],
-  model: string
-): Promise<string | null> => {
-  try {
-    const response = await axios.post<LLMResponse<T>>(
-      "https://api.together.xyz/v1/chat/completions",
-      {
-        model,
-        messages,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_LLM_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    return response?.data?.choices?.[0]?.message?.content ?? null;
-  } catch (error) {
-    console.error("LLM API error:", error);
-    return null;
-  }
-};
-
-
 export async function POST(req: Request) {
   const { userId, messages: chatMessages, model } = await req.json();
 
   // Rate limiting
   const { success } = await ratelimit.limit(userId);
-  console.log(success, "success");
   if (!success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -137,15 +111,15 @@ export async function POST(req: Request) {
   const domain = detectDomain(processedMessage?.content);
   if (domain) {
     const websiteContent = await fetchWithFirecrawl(`https://${domain}`);
-    console.log(websiteContent, "websiteContent");
     if (websiteContent) {
-      processedMessage.content = `Website content for ${domain}:\n${websiteContent}\n\nQuestion: ${processedMessage.content}`;
+      processedMessage.content = `Website content for ${domain}:\n${websiteContent?.data?.markdown}\n\nQuestion: ${processedMessage.content}`;
     } else {
       siteAccessError = `The site ${domain} could not be accessed. The response is based on general knowledge.`;
     }
   }
 
-  // Format messages for LLM
+  console.log(processedMessage?.content, "processedMessage?.content");
+
   const formattedMessages = chatMessages
     ?.slice(0, -1)
     ?.concat(processedMessage)
@@ -154,11 +128,20 @@ export async function POST(req: Request) {
       content: msg?.content,
     }));
 
-  // Get LLM response
-  const response = await getLLMResponse(formattedMessages, model);
-
-  return NextResponse.json({
-    response: response || "Sorry, I couldn't process that request.",
-    ...(siteAccessError && { fireCrawlError: siteAccessError }),
+  // Get LLM response as a stream
+  const res = await together.chat.completions.create({
+    model,
+    messages: formattedMessages,
+    stream: true,
   });
+
+  const responseStream = res.toReadableStream();
+
+  //Send fireCrawlError as a custom header
+  const headers = new Headers();
+  if (siteAccessError) {
+    headers.set("X-Firecrawl-Error", siteAccessError);
+  }
+
+  return new Response(responseStream, { headers });
 }

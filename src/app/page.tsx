@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream";
 import {
   MessageCircle,
   User,
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { v4 as uuidv4 } from "uuid";
 
 export interface Message {
   content: string;
@@ -165,14 +167,25 @@ const formatMessage = (content: string) => {
   return <div className="markdown-content">{formattedContent}</div>;
 };
 
+const newChatId = uuidv4();
+const newChat: ChatSession = {
+  id: newChatId,
+  title: "New Chat",
+  messages: [],
+  model: models[0].id,
+  createdAt: Date.now(),
+};
+
 export default function Index() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState(models?.[0]?.id);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [currentChatId, setCurrentChatId] = useState<string>("");
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string>(newChatId);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([
+    { ...newChat },
+  ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load chat sessions from localStorage
@@ -210,7 +223,7 @@ export default function Index() {
   }, [messages]);
 
   const createNewChat = () => {
-    const newChatId = Date.now().toString();
+    const newChatId = uuidv4();
     const newChat: ChatSession = {
       id: newChatId,
       title: "New Chat",
@@ -247,54 +260,92 @@ export default function Index() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const newMessage: Message = { content: input, isUser: true };
-    const updatedMessages = [...messages, newMessage];
-    setMessages(updatedMessages);
-    updateCurrentChat(updatedMessages);
+    // Add user message
+    const userMessage: Message = { content: input, isUser: true };
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    updateCurrentChat(newMessages);
     setInput("");
     setIsLoading(true);
 
+    // Add initial AI message (empty content)
+    const aiMessage: Message = { content: "", isUser: false };
+    const updatedMessages = [...newMessages, aiMessage];
+    setMessages(updatedMessages);
+    updateCurrentChat(updatedMessages);
+
     try {
-      const response: Response = await fetch("/api/chat", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: "user_123",
-          messages: updatedMessages, // Send entire message history
+          messages: newMessages,
           model: selectedModel,
         }),
       });
+      console.log(response, "response");
+      if (!response.body) throw new Error("No response body");
 
-      const data: ChatResponse = await response.json();
-
-      const aiMessage: string = data?.response || data?.error || "No response";
-      const finalMessages: Message[] = [
-        ...updatedMessages,
-        {
-          content: aiMessage,
-          isUser: false,
-          fireCrawlErrorMessage: data?.fireCrawlError,
-        },
-      ];
-
-      setMessages(finalMessages);
-      updateCurrentChat(finalMessages);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.log(error.message);
-      } else {
-        console.log("Unexpected error:", error);
+      if (response.status === 429) {
+        throw new Error("Too many requests. Please try again later.");
       }
 
-      const errorMessages = [
-        ...updatedMessages,
-        { content: "Error fetching response", isUser: false },
-      ];
+      const fireCrawlError = response.headers.get("X-Firecrawl-Error");
 
-      setMessages(errorMessages);
-      updateCurrentChat(errorMessages);
-    } finally {
-      setIsLoading(false);
+      console.log(fireCrawlError, "fireCrawlError");
+
+      const stream = ChatCompletionStream.fromReadableStream(response.body);
+
+      stream.on("content", (delta) => {
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          const lastIndex = newMessages.length - 1;
+
+          if (lastIndex >= 0 && !newMessages?.[lastIndex]?.isUser) {
+            newMessages[lastIndex] = {
+              ...newMessages[lastIndex],
+              content: newMessages?.[lastIndex]?.content + delta,
+              fireCrawlErrorMessage: fireCrawlError || "",
+            };
+          }
+
+          updateCurrentChat(newMessages);
+          return newMessages;
+        });
+      });
+
+      stream.on("end", () => {
+        setIsLoading(false);
+      });
+
+      stream.on("error", (error) => {
+        console.error("Stream error:", error);
+        setIsLoading(false);
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          const lastIndex = newMessages.length - 1;
+          if (lastIndex >= 0 && !newMessages[lastIndex].isUser) {
+            newMessages[lastIndex] = {
+              ...newMessages[lastIndex],
+              content:
+                newMessages[lastIndex].content + "\nError: Stream interrupted",
+            };
+          }
+          updateCurrentChat(newMessages);
+          return newMessages;
+        });
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setIsLoading(false);
+        const errorMessage: Message = {
+          content: error?.message || "Error Fetching Response",
+          isUser: false,
+        };
+        setMessages([...newMessages, errorMessage]);
+        updateCurrentChat([...newMessages, errorMessage]);
+      }
     }
   };
 
