@@ -66,6 +66,7 @@ const models: Model[] = [
 interface HelperPrompt {
   title: string;
   prompt: string;
+  example: string;
 }
 
 const helperPrompts: HelperPrompt[] = [
@@ -73,16 +74,20 @@ const helperPrompts: HelperPrompt[] = [
     title: "Crawl a Website",
     prompt:
       "Use Firecrawl to extract data from a website. Just provide the URL and I'll help you scrape the content.",
+    example:
+      "what solution's explain in this site https://www.reddit.com/r/nextjs/comments/r8doec/routerpush_vs_nextlink/",
   },
   {
     title: "Ask Questions",
     prompt:
       "Feel free to ask me anything! I can help with coding, writing, analysis, and more.",
+    example: "How do I implement authentication in Next.js?",
   },
   {
     title: "Get Creative",
     prompt:
       "Need creative ideas? I can help with brainstorming, story writing, or content creation.",
+    example: "Can you help me come up with a name for my new tech startup?",
   },
 ];
 
@@ -622,7 +627,7 @@ export default function Index() {
                   {helperPrompts?.map((prompt, index) => (
                     <button
                       key={index}
-                      onClick={() => setInput(prompt?.prompt)}
+                      onClick={() => setInput(prompt?.example)}
                       className="p-4 rounded-lg bg-[#40414f] hover:bg-[#2A2B32] transition-colors text-left"
                     >
                       <h3 className="font-medium mb-2">{prompt?.title}</h3>
