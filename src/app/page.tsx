@@ -60,12 +60,13 @@ const models: Model[] = [
     icon: <Sparkles className="w-5 h-5" />,
   },
   {
-    id: "meta-llama/Llama-3.3-13B-Instruct",
-    name: "Llama 3.3 13B",
-    description: "Faster instant responses",
+    id: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    name: "Llama 3.1 8B Turbo",
+    description: "Optimized for speed and efficiency",
     icon: <Zap className="w-5 h-5" />,
   },
 ];
+
 
 interface HelperPrompt {
   title: string;
