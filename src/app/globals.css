@@ -26,14 +26,15 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #2a2b32; /* Darker background for the track */
+  background: #1e1f24; 
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #343541; /* The color you specified */
+  background: #3c3e48; 
   border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4a4b55; /* Slightly lighter on hover */
+  background: #50525e; 
 }
+

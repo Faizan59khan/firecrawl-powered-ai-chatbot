@@ -16,36 +16,6 @@ interface FirecrawlResponse<T extends object = {}> {
   };
 }
 
-interface LLMMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-  tool_calls?: unknown[];
-}
-
-interface LLMChoice<T = unknown> {
-  finish_reason: string;
-  seed: number;
-  logprobs: T | null;
-  index: number;
-  message: LLMMessage;
-}
-
-interface LLMUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-}
-
-interface LLMResponse<T = unknown> {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  prompt: string[];
-  choices: LLMChoice<T>[];
-  usage: LLMUsage;
-}
-
 export const runtime = "edge";
 
 const ratelimit = new Ratelimit({

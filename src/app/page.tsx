@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, JSX } from "react";
 import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream";
 import {
   MessageCircle,
@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { v4 as uuidv4 } from "uuid";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export interface Message {
   content: string;
@@ -37,12 +39,6 @@ interface ChatSession {
   messages: Message[];
   model: string;
   createdAt: number;
-}
-
-interface ChatResponse {
-  response?: string;
-  error?: string;
-  fireCrawlError?: string;
 }
 
 interface Model {
@@ -97,12 +93,11 @@ const formatMessage = (content: string) => {
   const inlineCodeRegex = /`([^`]+)`/g;
   const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
 
-  // Split content by code blocks while preserving order
-  const sections = content?.split(codeBlockRegex);
+  const sections = content.split(codeBlockRegex);
 
-  const formattedContent = sections?.map((section, index) => {
-    // Handle multi-line code blocks
+  return sections.map((section, index) => {
     if (index % 3 === 2) {
+      // Code block processing
       return (
         <pre
           key={index}
@@ -113,68 +108,90 @@ const formatMessage = (content: string) => {
       );
     }
 
-    // Process regular text content
-    return section?.split("\n")?.map((line, i) => {
-      if (line?.startsWith("# "))
-        return (
-          <h1 key={i} className="text-2xl font-bold my-2">
-            {line?.slice(2)}
+    // Text content processing
+    const lines = section?.split("\n");
+    const elements: JSX.Element[] = [];
+
+    for (let i = 0; i < lines?.length; i++) {
+      const line = lines?.[i]?.trim();
+      if (!line) continue;
+
+      // Handle underline-style headers
+      if (i < lines?.length - 1) {
+        if (line.match(/^=+$/) || line.match(/^-+$/)) {
+          i++; // Skip the underline
+          continue;
+        }
+      }
+
+      // Handle different header types
+      if (line.startsWith("#") || line.startsWith("*")) {
+        elements.push(
+          <h1 key={`h1-${i}`} className="text-2xl font-bold my-4">
+            {line.slice(2, -2).trim()}
           </h1>
         );
-      if (line?.startsWith("## "))
-        return (
-          <h2 key={i} className="text-xl font-semibold my-2">
-            {line?.slice(3)}
+        continue;
+      }
+
+      if (line.startsWith("##") || line.startsWith("**")) {
+        elements.push(
+          <h2 key={`h2-${i}`} className="text-xl font-semibold my-3">
+            {line.slice(3, -3).trim()}
           </h2>
         );
-      if (line?.startsWith("### "))
-        return (
-          <h3 key={i} className="text-lg font-semibold my-2">
-            {line?.slice(4)}
+        continue;
+      }
+
+      if (line.startsWith("###") || line.startsWith("***")) {
+        elements.push(
+          <h3 key={`h3-${i}`} className="text-lg font-medium my-2">
+            {line.slice(4, -4).trim()}
           </h3>
         );
+        continue;
+      }
 
-      // Inline code
-      line = line?.replace(
+      // Process inline code and lists
+      const processedLine = line.replace(
         inlineCodeRegex,
-        `<code class='bg-gray-800 text-yellow-300 px-1 py-0.5 rounded-md font-mono'>$1</code>`
+        "<code class='bg-gray-800 text-yellow-300 px-1.5 py-0.5 rounded-md font-mono text-sm'>$1</code>"
       );
 
-      // Ordered list
-      if (/^\d+\./.test(line)) {
-        return (
-          <ol key={i} className="list-decimal ml-6">
+      if (/^\d+\.\s/.test(processedLine)) {
+        elements.push(
+          <ol key={`ol-${i}`} className="list-decimal ml-6 mb-3">
             <li
-              dangerouslySetInnerHTML={{ __html: line.replace(/^\d+\.\s/, "") }}
+              dangerouslySetInnerHTML={{
+                __html: processedLine.replace(/^\d+\.\s/, ""),
+              }}
             />
           </ol>
         );
+        continue;
       }
 
-      // Unordered list
-      if (/^\* /.test(line)) {
-        return (
-          <ul key={i} className="list-disc ml-6">
-            <li dangerouslySetInnerHTML={{ __html: line.slice(2) }} />
+      if (/^\*\s/.test(processedLine)) {
+        elements.push(
+          <ul key={`ul-${i}`} className="list-disc ml-6 mb-3">
+            <li dangerouslySetInnerHTML={{ __html: processedLine.slice(2) }} />
           </ul>
         );
+        continue;
       }
 
-      // Paragraphs
-      return <p key={i} dangerouslySetInnerHTML={{ __html: line }} />;
-    });
+      // Handle regular paragraphs
+      elements.push(
+        <p
+          key={`p-${i}`}
+          className="mb-3 text-gray-300 leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: processedLine }}
+        />
+      );
+    }
+
+    return <div key={index}>{elements}</div>;
   });
-
-  return <div className="markdown-content">{formattedContent}</div>;
-};
-
-const newChatId = uuidv4();
-const newChat: ChatSession = {
-  id: newChatId,
-  title: "New Chat",
-  messages: [],
-  model: models?.[0]?.id,
-  createdAt: Date.now(),
 };
 
 export default function Index() {
@@ -183,12 +200,19 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState(models?.[0]?.id);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [currentChatId, setCurrentChatId] = useState<string>(newChatId);
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([
-    { ...newChat },
-  ]);
+  const [currentChatId, setCurrentChatId] = useState<string>("");
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const searchParams = useSearchParams();
+  const chatId = searchParams.get("chatId");
+  const router = useRouter();
+
+  useEffect(() => {
+    if (chatId) {
+      setCurrentChatId(chatId as string);
+    }
+  }, [chatId]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -207,11 +231,11 @@ export default function Index() {
       const parsedSessions = JSON.parse(savedSessions);
       setChatSessions(parsedSessions);
 
-      if (parsedSessions.length === 0) {
-        // Perform your action here
-        console.log("There are saved chat sessions:", parsedSessions);
-        createNewChat();
-      }
+      // if (parsedSessions.length === 0) {
+      //   // Perform your action here
+      //   console.log("There are saved chat sessions:", parsedSessions);
+      //   createNewChat();
+      // }
     }
   }, []);
 
@@ -253,11 +277,32 @@ export default function Index() {
     setChatSessions((prev) => [newChat, ...prev]);
     setCurrentChatId(newChatId);
     setMessages([]);
+    router.push(`/?chatId=${newChatId}`);
+  };
+
+  const createNewChatWithMessage = (messages: Message[]) => {
+    // If there's no currentChatId, create a new chat
+    const newChatId = uuidv4();
+    const newChat: ChatSession = {
+      id: newChatId,
+      title: messages?.[0]?.content?.slice(0, 30) + "..." || "New Chat",
+      messages,
+      model: selectedModel,
+      createdAt: Date.now(),
+    };
+
+    setChatSessions((prev) => [newChat, ...prev]);
+    setCurrentChatId(newChatId);
+    setMessages(messages);
+    setTimeout(() => {
+      router.push(`/?chatId=${newChatId}`);
+    });
   };
 
   const updateCurrentChat = (messages: Message[]) => {
     if (!currentChatId) return;
 
+    // If chat exists, update it
     setChatSessions((prev) =>
       prev?.map((chat) => {
         if (chat?.id === currentChatId) {
@@ -281,17 +326,16 @@ export default function Index() {
 
     // Add user message
     const userMessage: Message = { content: input, isUser: true };
-    const newMessages = [...messages, userMessage];
+    const aiMessage: Message = { content: "", isUser: false };
+    const newMessages = [...messages, userMessage, aiMessage];
     setMessages(newMessages);
-    updateCurrentChat(newMessages);
     setInput("");
     setIsLoading(true);
-
-    // Add initial AI message (empty content)
-    const aiMessage: Message = { content: "", isUser: false };
-    const updatedMessages = [...newMessages, aiMessage];
-    setMessages(updatedMessages);
-    updateCurrentChat(updatedMessages);
+    if (!currentChatId) {
+      createNewChatWithMessage(newMessages);
+    } else {
+      updateCurrentChat(newMessages);
+    }
 
     try {
       const response = await fetch("/api/chat", {
@@ -303,7 +347,6 @@ export default function Index() {
           model: selectedModel,
         }),
       });
-      console.log(response, "response");
       if (!response.body) throw new Error("No response body");
 
       if (response.status === 429) {
@@ -369,13 +412,34 @@ export default function Index() {
     }
   };
 
+  const resetStates = () => {
+    setMessages([]);
+    setCurrentChatId("");
+    setTimeout(() => {
+      router.push(`/`);
+    }, 0);
+  };
+
   const deleteChat = (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setChatSessions((prev) => prev?.filter((chat) => chat?.id !== chatId));
-    if (currentChatId === chatId) {
-      setCurrentChatId("");
-      setMessages([]);
-    }
+
+    setChatSessions((prev) => {
+      const updatedChats = prev?.filter((chat) => chat?.id !== chatId) || [];
+
+      if (currentChatId === chatId) {
+        if (updatedChats.length > 0) {
+          setCurrentChatId(updatedChats[0].id);
+          setMessages(updatedChats[0].messages || []);
+          setTimeout(() => {
+            router.push(`/?chatId=${updatedChats[0].id}`);
+          }, 0);
+        } else {
+          resetStates();
+        }
+      }
+
+      return updatedChats;
+    });
   };
 
   const renameChat = (chatId: string, e: React.MouseEvent) => {
@@ -389,6 +453,11 @@ export default function Index() {
     setChatSessions((prev) =>
       prev?.map((c) => (c?.id === chatId ? { ...c, title: newTitle } : c))
     );
+  };
+
+  const handleChatSelection = (chat: ChatSession) => {
+    setCurrentChatId(chat?.id);
+    router.push(`/?chatId=${chat?.id}`);
   };
 
   return (
@@ -429,8 +498,8 @@ export default function Index() {
         <div className="flex-1 overflow-y-auto space-y-2">
           {chatSessions?.map((chat) => (
             <div
-              key={chat.id}
-              onClick={() => setCurrentChatId(chat.id)}
+              key={chat?.id}
+              onClick={() => handleChatSelection(chat)}
               className={`w-full p-3 rounded-lg text-left hover:bg-gray-700 transition-colors flex items-center gap-2 group cursor-pointer ${
                 currentChatId === chat.id ? "bg-gray-700" : ""
               }`}
@@ -598,11 +667,16 @@ export default function Index() {
             </div>
 
             <form onSubmit={handleSubmit} className="relative">
-              <input
-                type="text"
+              <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                className="w-full bg-[#40414f] text-white rounded-lg pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e as unknown as React.FormEvent);
+                  }
+                }}
+                className="w-full bg-[#40414f] text-white rounded-lg pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                 placeholder="Type your message..."
               />
               <button
