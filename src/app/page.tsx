@@ -24,8 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { v4 as uuidv4 } from "uuid";
-import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
+import { getQueryParam } from "@/lib/util";
 
 export interface Message {
   content: string;
@@ -204,15 +204,14 @@ export default function Index() {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const searchParams = useSearchParams();
-  const chatId = searchParams.get("chatId");
   const router = useRouter();
 
   useEffect(() => {
-    if (chatId) {
-      setCurrentChatId(chatId as string);
+    const chatIdFromUrl = getQueryParam("chatId");
+    if (chatIdFromUrl) {
+      setCurrentChatId(chatIdFromUrl);
     }
-  }, [chatId]);
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
