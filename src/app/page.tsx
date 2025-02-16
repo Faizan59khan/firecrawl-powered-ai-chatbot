@@ -67,7 +67,6 @@ const models: Model[] = [
   },
 ];
 
-
 interface HelperPrompt {
   title: string;
   prompt: string;
@@ -174,7 +173,7 @@ const newChat: ChatSession = {
   id: newChatId,
   title: "New Chat",
   messages: [],
-  model: models[0].id,
+  model: models?.[0]?.id,
   createdAt: Date.now(),
 };
 
@@ -205,7 +204,14 @@ export default function Index() {
   useEffect(() => {
     const savedSessions = localStorage.getItem("chatSessions");
     if (savedSessions) {
-      setChatSessions(JSON.parse(savedSessions));
+      const parsedSessions = JSON.parse(savedSessions);
+      setChatSessions(parsedSessions);
+
+      if (parsedSessions.length === 0) {
+        // Perform your action here
+        console.log("There are saved chat sessions:", parsedSessions);
+        createNewChat();
+      }
     }
   }, []);
 
