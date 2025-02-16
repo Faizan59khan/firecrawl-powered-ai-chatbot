@@ -212,14 +212,16 @@ export default function Index() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState(models?.[0]?.id);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(
-    window.innerWidth < 768 ? false : true
-  );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string>("");
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setIsSidebarOpen(window.innerWidth >= 768);
+  }, []);
 
   useEffect(() => {
     const chatIdFromUrl = getQueryParam("chatId");
