@@ -114,6 +114,7 @@ const formatMessage = (content: string) => {
 
     for (let i = 0; i < lines?.length; i++) {
       const line = lines?.[i]?.trim();
+      // console.log(line, "line");
       if (!line) continue;
 
       // Handle underline-style headers
@@ -125,28 +126,40 @@ const formatMessage = (content: string) => {
       }
 
       // Handle different header types
-      if (line.startsWith("#") || line.startsWith("*")) {
+      if (
+        (line.startsWith("#") || line.startsWith("*")) &&
+        line.length < 40 &&
+        (line.endsWith("#") || line.endsWith("*") || line.endsWith(":"))
+      ) {
         elements.push(
           <h1 key={`h1-${i}`} className="text-2xl font-bold my-4">
-            {line.slice(2, -2).trim()}
+            {line.slice(2, line?.endsWith(":") ? -3 : -2).trim()}
           </h1>
         );
         continue;
       }
 
-      if (line.startsWith("##") || line.startsWith("**")) {
+      if (
+        (line.startsWith("##") || line.startsWith("**")) &&
+        line.length < 40 &&
+        (line.endsWith("#") || line.endsWith("*") || line.endsWith(":"))
+      ) {
         elements.push(
           <h2 key={`h2-${i}`} className="text-xl font-semibold my-3">
-            {line.slice(3, -3).trim()}
+            {line.slice(3, line?.endsWith(":") ? -4 : -3).trim()}
           </h2>
         );
         continue;
       }
 
-      if (line.startsWith("###") || line.startsWith("***")) {
+      if (
+        (line.startsWith("###") || line.startsWith("***")) &&
+        line.length < 40 &&
+        (line.endsWith("#") || line.endsWith("*") || line.endsWith(":"))
+      ) {
         elements.push(
           <h3 key={`h3-${i}`} className="text-lg font-medium my-2">
-            {line.slice(4, -4).trim()}
+            {line.slice(4, line?.endsWith(":") ? -5 : -4).trim()}
           </h3>
         );
         continue;
