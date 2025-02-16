@@ -14,6 +14,7 @@ import {
   Trash2,
   Edit2,
   Flame,
+  X,
 } from "lucide-react";
 import {
   Select,
@@ -187,6 +188,17 @@ export default function Index() {
     { ...newChat },
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) setIsSidebarOpen(true);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Load chat sessions from localStorage
   useEffect(() => {
@@ -307,6 +319,7 @@ export default function Index() {
               ...newMessages[lastIndex],
               content: newMessages?.[lastIndex]?.content + delta,
               fireCrawlErrorMessage: fireCrawlError || "",
+              isUser: false,
             };
           }
 
@@ -372,13 +385,32 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-[#343541] text-gray-100 flex">
+    <div className="relative min-h-screen bg-[#343541] text-gray-100 flex">
+      {/* Mobile Backdrop */}
+      {isSidebarOpen && isMobile && (
+        <div
+          className="fixed inset-0 bg-black/50 z-20"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       {/* Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 bg-[#202123] transition-transform duration-300 transform ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } w-64 p-4 flex flex-col z-10`}
+        } w-full md:w-64 p-4 flex flex-col z-30`}
       >
+        <div className="flex items-center justify-between mb-4 md:hidden">
+          <div className="flex items-center gap-2 text-xl font-bold text-violet-400">
+            <Flame className="w-6 h-6" />
+            FireChat AI
+          </div>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-2 hover:bg-gray-700 rounded-lg"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
         <button
           onClick={createNewChat}
           className="flex items-center gap-2 w-full p-3 rounded-lg border border-gray-700 hover:bg-gray-700 transition-colors mb-4"
@@ -422,6 +454,13 @@ export default function Index() {
           ))}
         </div>
       </div>
+      {/* Logo */}
+      {!isMobile ? (
+        <div className="absolute right-10 top-6 flex items-center gap-2 text-2xl font-bold text-violet-400">
+          <Flame className="w-8 h-8" />
+          FireChat AI
+        </div>
+      ) : null}
 
       {/* Toggle Sidebar Button */}
       <button
@@ -436,133 +475,138 @@ export default function Index() {
       {/* Main Content */}
       <div
         className={`flex-1 transition-all duration-300 ${
-          isSidebarOpen ? "ml-64" : "ml-0"
+          isSidebarOpen ? "md:ml-64" : "ml-0"
         }`}
       >
-        <div className="max-w-4xl mx-auto p-4">
-          {/* Logo */}
-          <div className="flex items-center justify-between mb-8">
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[300px] h-auto bg-[#40414f] border-0 text-white">
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#40414f] border-gray-700">
-                {models?.map((model) => (
-                  <SelectItem
-                    key={model.id}
-                    value={model.id}
-                    className="text-white hover:bg-[#2A2B32] focus:bg-[#2A2B32]"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex-shrink-0 text-violet-400">
-                        {model?.icon}
-                      </div>
-                      <div>
-                        <div className="font-medium">{model?.name}</div>
-                        <div className="text-sm text-gray-400">
-                          {model?.description}
+        <div className="max-w-4xl mx-auto h-full flex flex-col">
+          {/* Model Selector */}
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-8">
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="w-full sm:w-[300px] h-auto bg-[#40414f] border-0 text-white">
+                  <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#40414f] border-gray-700">
+                  {models?.map((model) => (
+                    <SelectItem
+                      key={model.id}
+                      value={model.id}
+                      className="text-white hover:bg-[#2A2B32] focus:bg-[#2A2B32]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex-shrink-0 text-violet-400">
+                          {model?.icon}
+                        </div>
+                        <div>
+                          <div className="font-medium">{model?.name}</div>
+                          <div className="text-sm text-gray-400">
+                            {model?.description}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-2 text-2xl font-bold text-violet-400">
-              <Flame className="w-8 h-8" />
-              FireChat AI
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
+          {/* Messages & Helper Prompts */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+            {messages?.length === 0 && (
+              <div className="text-center mb-8">
+                <h1 className="text-3xl md:text-4xl font-bold mb-4 text-violet-400">
+                  Welcome to FireChat AI
+                </h1>
+                <p className="text-gray-400 mb-8">
+                  Your intelligent assistant powered by Llama 3.3. Ask me
+                  anything, from coding to creative writing!
+                </p>
 
-          {messages?.length === 0 && (
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold mb-4 text-violet-400">
-                Welcome to FireChat AI
-              </h1>
-              <p className="text-gray-400 mb-8">
-                Your intelligent assistant powered by Llama 3.3. Ask me
-                anything, from coding to creative writing!
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {helperPrompts?.map((prompt, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setInput(prompt?.prompt)}
-                    className="p-4 rounded-lg bg-[#40414f] hover:bg-[#2A2B32] transition-colors text-left"
-                  >
-                    <h3 className="font-medium mb-2">{prompt?.title}</h3>
-                    <p className="text-sm text-gray-400">{prompt?.prompt}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mb-4 space-y-4 h-[calc(100vh-240px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
-            {messages?.map((msg, i) => (
-              <div
-                key={i}
-                className={`message-animation flex items-start gap-4 p-4 ${
-                  msg?.isUser ? "bg-[#343541]" : "bg-[#444654]"
-                }`}
-              >
-                <div
-                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                    msg.isUser ? "bg-violet-500" : "bg-teal-500"
-                  }`}
-                >
-                  {msg.isUser ? (
-                    <User className="w-5 h-5 text-white" />
-                  ) : (
-                    <MessageCircle className="w-5 h-5 text-white" />
-                  )}
-                </div>
-                <div className="flex-1 space-y-2 overflow-hidden">
-                  {formatMessage(msg?.content)}
-                  {msg?.fireCrawlErrorMessage && (
-                    <span className="block text-red-500">
-                      {msg?.fireCrawlErrorMessage}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="message-animation flex items-start gap-4 p-4 bg-[#444654]">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Loader className="w-4 h-4 animate-spin" />
-                  <span className="text-gray-400">AI is thinking...</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {helperPrompts?.map((prompt, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setInput(prompt?.prompt)}
+                      className="p-4 rounded-lg bg-[#40414f] hover:bg-[#2A2B32] transition-colors text-left"
+                    >
+                      <h3 className="font-medium mb-2">{prompt?.title}</h3>
+                      <p className="text-sm text-gray-400">{prompt?.prompt}</p>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
+
+            <div className="space-y-4 pb-4">
+              {messages?.map((msg, i) =>
+                msg?.content || msg?.fireCrawlErrorMessage ? (
+                  <div
+                    key={i}
+                    className={`message-animation flex items-start gap-4 p-4 ${
+                      msg?.isUser ? "bg-[#343541]" : "bg-[#444654]"
+                    } rounded-lg`}
+                  >
+                    <div
+                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                        msg?.isUser ? "bg-violet-500" : "bg-teal-500"
+                      }`}
+                    >
+                      {msg?.isUser ? (
+                        <User className="w-5 h-5 text-white" />
+                      ) : (
+                        <MessageCircle className="w-5 h-5 text-white" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2 overflow-hidden">
+                      {formatMessage(msg?.content)}
+                      {msg?.fireCrawlErrorMessage && (
+                        <span className="block text-red-500">
+                          {msg?.fireCrawlErrorMessage}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : null
+              )}
+              {isLoading && (
+                <div className="message-animation flex items-start gap-4 p-4 bg-[#444654] rounded-lg">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center">
+                    <MessageCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span className="text-gray-400">AI is thinking...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
 
-          <div className="mt-4 mb-4 text-center text-sm text-gray-400">
-            FireChat AI can help you with various tasks including web crawling,
-            coding, writing, and analysis.
-          </div>
+          {/* Input Area */}
+          <div className="sticky bottom-0 bg-[#343541] pt-4 pb-6 px-4 sm:px-6">
+            <div className="mb-2 text-center text-sm text-gray-400">
+              FireChat AI can help you with various tasks including web
+              crawling, coding, writing, and analysis.
+            </div>
 
-          <form onSubmit={handleSubmit} className="relative">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="w-full bg-[#40414f] text-white rounded-lg pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500"
-              placeholder="Type your message..."
-            />
-            <button
-              type="submit"
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading || !input.trim()}
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
+            <form onSubmit={handleSubmit} className="relative">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                className="w-full bg-[#40414f] text-white rounded-lg pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                placeholder="Type your message..."
+              />
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoading || !input.trim()}
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
