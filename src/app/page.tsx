@@ -212,11 +212,13 @@ export default function Index() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState(models?.[0]?.id);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    window.innerWidth < 768 ? false : true
+  );
   const [currentChatId, setCurrentChatId] = useState<string>("");
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -566,7 +568,11 @@ export default function Index() {
           isSidebarOpen ? "md:ml-64" : "ml-0"
         }`}
       >
-        <div className="max-w-4xl mx-auto h-full flex flex-col">
+        <div
+          className={`${
+            isMobile ? "max-w-[360px]" : "max-w-4xl"
+          } mx-auto h-full flex flex-col`}
+        >
           {/* Model Selector */}
           <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between mb-8">
