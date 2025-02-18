@@ -95,12 +95,12 @@ const helperPrompts: HelperPrompt[] = [
 const formatMessage = (content: string) => {
   if (!content) return null;
 
-  const inlineCodeRegex = /`([^`]+)`/g;
+  // const inlineCodeRegex = /`([^`]+)`/g;
   const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
 
-  const sections = content.split(codeBlockRegex);
+  const sections = content?.split(codeBlockRegex);
 
-  return sections.map((section, index) => {
+  return sections?.map((section, index) => {
     if (index % 3 === 2) {
       // Code block processing
       return (
@@ -118,64 +118,73 @@ const formatMessage = (content: string) => {
     const elements: JSX.Element[] = [];
 
     for (let i = 0; i < lines?.length; i++) {
-      const line = lines?.[i]?.trim();
-      // console.log(line, "line");
+      const line = lines[i]?.trim();
       if (!line) continue;
 
-      // Handle underline-style headers
-      if (i < lines?.length - 1) {
-        if (line.match(/^=+$/) || line.match(/^-+$/)) {
+      // Handle underline-style headers (corrected logic)
+      if (i < lines.length - 1) {
+        const nextLine = lines[i + 1]?.trim();
+        if (nextLine.match(/^=+$/)) {
+          elements.push(
+            <h1 key={`h1-${i}`} className="text-2xl font-bold my-4">
+              {line}
+            </h1>
+          );
+          i++; // Skip the underline
+          continue;
+        }
+        if (nextLine.match(/^-+$/)) {
+          elements.push(
+            <h2 key={`h2-${i}`} className="text-xl font-semibold my-3">
+              {line}
+            </h2>
+          );
           i++; // Skip the underline
           continue;
         }
       }
 
-      // Handle different header types
-      if (
-        (line.startsWith("#") || line.startsWith("*")) &&
-        line.length < 40 &&
-        (line.endsWith("#") || line.endsWith("*") || line.endsWith(":"))
-      ) {
-        elements.push(
-          <h1 key={`h1-${i}`} className="text-2xl font-bold my-4">
-            {line.slice(2, line?.endsWith(":") ? -3 : -2).trim()}
-          </h1>
-        );
-        continue;
+      // Handle header levels using # only
+      const headerMatch = line.match(/^(#+)\s*(.*?)\s*#*$/);
+      if (headerMatch && line.length < 60) {
+        const [_, hashes, content] = headerMatch;
+        const level = hashes?.length;
+
+        if (level === 1) {
+          elements.push(
+            <h1 key={`h1-${i}`} className="text-2xl font-bold my-4">
+              {content}
+            </h1>
+          );
+          continue;
+        }
+        if (level === 2) {
+          elements.push(
+            <h2 key={`h2-${i}`} className="text-xl font-semibold my-3">
+              {content}
+            </h2>
+          );
+          continue;
+        }
+        if (level >= 3) {
+          elements.push(
+            <h3 key={`h3-${i}`} className="text-lg font-medium my-2">
+              {content}
+            </h3>
+          );
+          continue;
+        }
       }
 
-      if (
-        (line.startsWith("##") || line.startsWith("**")) &&
-        line.length < 40 &&
-        (line.endsWith("#") || line.endsWith("*") || line.endsWith(":"))
-      ) {
-        elements.push(
-          <h2 key={`h2-${i}`} className="text-xl font-semibold my-3">
-            {line.slice(3, line?.endsWith(":") ? -4 : -3).trim()}
-          </h2>
+      // Process inline formatting (added bold handling)
+      const processedLine = line
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(
+          /`([^`]+)`/g,
+          '<code class="bg-gray-800 text-yellow-300 px-1.5 py-0.5 rounded-md font-mono text-sm">$1</code>'
         );
-        continue;
-      }
 
-      if (
-        (line.startsWith("###") || line.startsWith("***")) &&
-        line.length < 40 &&
-        (line.endsWith("#") || line.endsWith("*") || line.endsWith(":"))
-      ) {
-        elements.push(
-          <h3 key={`h3-${i}`} className="text-lg font-medium my-2">
-            {line.slice(4, line?.endsWith(":") ? -5 : -4).trim()}
-          </h3>
-        );
-        continue;
-      }
-
-      // Process inline code and lists
-      const processedLine = line.replace(
-        inlineCodeRegex,
-        "<code class='bg-gray-800 text-yellow-300 px-1.5 py-0.5 rounded-md font-mono text-sm'>$1</code>"
-      );
-
+      // Handle lists
       if (/^\d+\.\s/.test(processedLine)) {
         elements.push(
           <ol key={`ol-${i}`} className="list-decimal ml-6 mb-3">
@@ -251,12 +260,6 @@ export default function Index() {
     if (savedSessions) {
       const parsedSessions = JSON.parse(savedSessions);
       setChatSessions(parsedSessions);
-
-      // if (parsedSessions.length === 0) {
-      //   // Perform your action here
-      //   console.log("There are saved chat sessions:", parsedSessions);
-      //   createNewChat();
-      // }
     }
   }, []);
 
@@ -292,7 +295,7 @@ export default function Index() {
       id: newChatId,
       title: "New Chat",
       messages: [],
-      model: models[0].id,
+      model: models?.[0].id,
       createdAt: Date.now(),
     };
     setChatSessions((prev) => [newChat, ...prev]);
@@ -301,7 +304,7 @@ export default function Index() {
     router.push(`/?chatId=${newChatId}`);
   };
 
-  const createNewChatWithMessage = (messages: Message[]) => {
+  const createNewChatWithMessage = (messages: Message[]): string => {
     // If there's no currentChatId, create a new chat
     const newChatId = uuidv4();
     const newChat: ChatSession = {
@@ -318,15 +321,22 @@ export default function Index() {
     setTimeout(() => {
       router.push(`/?chatId=${newChatId}`);
     });
+
+    return newChatId;
   };
 
-  const updateCurrentChat = (messages: Message[]) => {
-    if (!currentChatId) return;
+  const updateCurrentChat = (
+    messages: Message[],
+    newlyCreatedChatId: string | null = null
+  ) => {
+    const chatId: string | null = currentChatId || newlyCreatedChatId;
+    if (!chatId) return;
 
     // If chat exists, update it
     setChatSessions((prev) =>
       prev?.map((chat) => {
-        if (chat?.id === currentChatId) {
+        // console.log(chat);
+        if (chat?.id === chatId) {
           const title =
             messages?.[0]?.content?.slice(0, 30) + "..." || "New Chat";
           return {
@@ -352,8 +362,10 @@ export default function Index() {
     setMessages(newMessages);
     setInput("");
     setIsLoading(true);
+
+    let newlyCreatedChatId: string | null;
     if (!currentChatId) {
-      createNewChatWithMessage(newMessages);
+      newlyCreatedChatId = createNewChatWithMessage(newMessages);
     } else {
       updateCurrentChat(newMessages);
     }
@@ -394,7 +406,7 @@ export default function Index() {
             };
           }
 
-          updateCurrentChat(newMessages);
+          updateCurrentChat(newMessages, newlyCreatedChatId);
           return newMessages;
         });
       });
