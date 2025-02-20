@@ -109,7 +109,7 @@ Contributions are welcome! Feel free to open an issue or submit a pull request.
 ---
 
 ## Contact
-For any inquiries, reach out to **[your email or GitHub handle]**.
+For any inquiries, reach out to **muhammadfaizanse59@gmail.com**.
 
 ---
 
